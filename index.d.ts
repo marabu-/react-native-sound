@@ -58,7 +58,7 @@ declare class Sound {
    * Plays the loaded file
    * @param onEnd - Optional callback function that gets called when the playback finishes successfully or an audio decoding error interrupts it
    */
-  play(onEnd?: () => void): void
+  play(onEnd?: (result: boolean) => void): void
 
   /**
    * Pause the sound
@@ -137,11 +137,12 @@ declare class Sound {
    */
   getCurrentTime(cb?: (seconds: number, isPlaying: boolean) => void): void
 
-  /**
-   * Seek to a particular playback point in seconds.
-   * @param value
-   */
-  setCurrentTime(value: number): void
+    /**
+     * Seek to a particular playback point in seconds.
+     * @param value
+     * @param cb
+     */
+  setCurrentTime(value: number, cb?: () => void): void
 
   /**
    * Speed of the audio playback (iOS Only).
