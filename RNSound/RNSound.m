@@ -211,7 +211,7 @@ RCT_EXPORT_METHOD(prepare:(NSString*)fileName
     callback(@[[NSNull null], @{@"duration": @(player.duration),
                                 @"numberOfChannels": @(player.numberOfChannels)}]);
   } else {
-    callback(@[RCTJSErrorFromNSError(error)]);
+    callback(@[RCTJSErrorFromNSError(error)], @[[NSNull null]);
   }
 }
 

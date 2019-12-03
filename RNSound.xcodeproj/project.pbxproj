@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		19825A221BD4A89800EE0337 /* RNSound.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 19825A211BD4A89800EE0337 /* RNSound.h */; };
+		19825A221BD4A89800EE0337 /* RNSound.h in Copy Files */ = {isa = PBXBuildFile; fileRef = 19825A211BD4A89800EE0337 /* RNSound.h */; };
 		19825A241BD4A89800EE0337 /* RNSound.m in Sources */ = {isa = PBXBuildFile; fileRef = 19825A231BD4A89800EE0337 /* RNSound.m */; };
 /* End PBXBuildFile section */
 
@@ -134,14 +134,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		19825A1C1BD4A89800EE0337 /* CopyFiles */ = {
+		19825A1C1BD4A89800EE0337 /* Copy Files */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "include/$(PRODUCT_NAME)";
 			dstSubfolderSpec = 16;
 			files = (
-				19825A221BD4A89800EE0337 /* RNSound.h in CopyFiles */,
+				19825A221BD4A89800EE0337 /* RNSound.h in Copy Files */,
 			);
+			name = "Copy Files";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -222,7 +223,7 @@
 			buildPhases = (
 				19825A1A1BD4A89800EE0337 /* Sources */,
 				19825A1B1BD4A89800EE0337 /* Frameworks */,
-				19825A1C1BD4A89800EE0337 /* CopyFiles */,
+				19825A1C1BD4A89800EE0337 /* Copy Files */,
 			);
 			buildRules = (
 			);
