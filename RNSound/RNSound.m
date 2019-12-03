@@ -70,35 +70,40 @@
   return [NSSearchPathForDirectoriesInDomains(directory, NSUserDomainMask, YES) firstObject];
 }
 
--(void) audioPlayerDidFinishPlaying:(AVAudioPlayer*)player
+- (void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player
                        successfully:(BOOL)flag {
-  NSNumber* key = [self keyForPlayer:player];
-  if (key == nil) return;
+    @synchronized(self) {
+        NSNumber *key = [self keyForPlayer:player];
+        if (key == nil)
+            return;
 
-  @synchronized(key) {
-    [self setOnPlay:NO forPlayerKey:key];
-    RCTResponseSenderBlock callback = [self callbackForKey:key];
-    if (callback) {
-      callback(@[@(flag)]);
-      [[self callbackPool] removeObjectForKey:key];
+        [self setOnPlay:NO forPlayerKey:key];
+        RCTResponseSenderBlock callback = [self callbackForKey:key];
+        if (callback) {
+            callback(
+                [NSArray arrayWithObjects:[NSNumber numberWithBool:flag], nil]);
+            [[self callbackPool] removeObjectForKey:key];
+        }
     }
-  }
 }
 
 RCT_EXPORT_MODULE();
 
--(NSArray<NSString *> *)supportedEvents
-  {
-    return @[@"onPlayChange"];
-  }
+- (NSArray<NSString *> *)supportedEvents {
+    return [NSArray arrayWithObjects:@"onPlayChange", nil];
+}
 
--(NSDictionary *)constantsToExport {
-  return @{@"IsAndroid": [NSNumber numberWithBool:NO],
-           @"MainBundlePath": [[NSBundle mainBundle] bundlePath],
-           @"NSDocumentDirectory": [self getDirectory:NSDocumentDirectory],
-           @"NSLibraryDirectory": [self getDirectory:NSLibraryDirectory],
-           @"NSCachesDirectory": [self getDirectory:NSCachesDirectory],
-           };
+- (NSDictionary *)constantsToExport {
+    return [NSDictionary
+        dictionaryWithObjectsAndKeys:[NSNumber numberWithBool:NO], @"IsAndroid",
+                                     [[NSBundle mainBundle] bundlePath],
+                                     @"MainBundlePath",
+                                     [self getDirectory:NSDocumentDirectory],
+                                     @"NSDocumentDirectory",
+                                     [self getDirectory:NSLibraryDirectory],
+                                     @"NSLibraryDirectory",
+                                     [self getDirectory:NSCachesDirectory],
+                                     @"NSCachesDirectory", nil];
 }
 
 RCT_EXPORT_METHOD(enable:(BOOL)enabled) {
@@ -203,84 +208,121 @@ RCT_EXPORT_METHOD(prepare:(NSString*)fileName
               error:&error];
   }
 
-  if (player) {
-    player.delegate = self;
-    player.enableRate = YES;
-    [player prepareToPlay];
-    [[self playerPool] setObject:player forKey:key];
-    callback(@[[NSNull null], @{@"duration": @(player.duration),
-                                @"numberOfChannels": @(player.numberOfChannels)}]);
-  } else {
-    callback(@[RCTJSErrorFromNSError(error)], @[[NSNull null]);
-  }
+    if (player) {
+        @synchronized(self) {
+            player.delegate = self;
+            player.enableRate = YES;
+            [player prepareToPlay];
+            [[self playerPool] setObject:player forKey:key];
+            callback([NSArray
+                arrayWithObjects:[NSNull null],
+                                 [NSDictionary
+                                     dictionaryWithObjectsAndKeys:
+                                         [NSNumber
+                                             numberWithDouble:player.duration],
+                                         @"duration",
+                                         [NSNumber numberWithUnsignedInteger:
+                                                       player.numberOfChannels],
+                                         @"numberOfChannels", nil],
+                                 nil]);
+        }
+    } else {
+        callback([NSArray arrayWithObjects:RCTJSErrorFromNSError(error), nil]);
+    }
 }
 
-RCT_EXPORT_METHOD(play:(nonnull NSNumber*)key withCallback:(RCTResponseSenderBlock)callback) {
-  [[AVAudioSession sharedInstance] setActive:YES error:nil];
-  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audioSessionChangeObserver:) name:AVAudioSessionRouteChangeNotification object:nil];
-  self._key = key;
-  AVAudioPlayer* player = [self playerForKey:key];
-  if (player) {
-    [[self callbackPool] setObject:[callback copy] forKey:key];
-    [player play];
-    [self setOnPlay:YES forPlayerKey:key];
-  }
+RCT_EXPORT_METHOD(play
+                  : (nonnull NSNumber *)key withCallback
+                  : (RCTResponseSenderBlock)callback) {
+    [[AVAudioSession sharedInstance] setActive:YES error:nil];
+    [[NSNotificationCenter defaultCenter]
+        addObserver:self
+           selector:@selector(audioSessionChangeObserver:)
+               name:AVAudioSessionRouteChangeNotification
+             object:nil];
+    self._key = key;
+    AVAudioPlayer *player = [self playerForKey:key];
+    if (player) {
+        [[self callbackPool] setObject:[callback copy] forKey:key];
+        [player play];
+        [self setOnPlay:YES forPlayerKey:key];
+    }
 }
 
-RCT_EXPORT_METHOD(pause:(nonnull NSNumber*)key withCallback:(RCTResponseSenderBlock)callback) {
-  AVAudioPlayer* player = [self playerForKey:key];
-  if (player) {
-    [player pause];
-    callback(@[]);
-  }
+RCT_EXPORT_METHOD(pause
+                  : (nonnull NSNumber *)key withCallback
+                  : (RCTResponseSenderBlock)callback) {
+    AVAudioPlayer *player = [self playerForKey:key];
+    if (player) {
+        [player pause];
+        callback([NSArray array]);
+    }
 }
 
-RCT_EXPORT_METHOD(stop:(nonnull NSNumber*)key withCallback:(RCTResponseSenderBlock)callback) {
-  AVAudioPlayer* player = [self playerForKey:key];
-  if (player) {
-    [player stop];
-    player.currentTime = 0;
-    callback(@[]);
-  }
+RCT_EXPORT_METHOD(stop
+                  : (nonnull NSNumber *)key withCallback
+                  : (RCTResponseSenderBlock)callback) {
+    AVAudioPlayer *player = [self playerForKey:key];
+    if (player) {
+        [player stop];
+        player.currentTime = 0;
+        callback([NSArray array]);
+    }
 }
 
-RCT_EXPORT_METHOD(release:(nonnull NSNumber*)key) {
-  AVAudioPlayer* player = [self playerForKey:key];
-  if (player) {
-    [player stop];
-    [[self callbackPool] removeObjectForKey:player];
-    [[self playerPool] removeObjectForKey:key];
-    NSNotificationCenter *notificationCenter = [NSNotificationCenter defaultCenter];
-    [notificationCenter removeObserver:self];
-  }
+RCT_EXPORT_METHOD(release : (nonnull NSNumber *)key) {
+    @synchronized(self) {
+        AVAudioPlayer *player = [self playerForKey:key];
+        if (player) {
+            [player stop];
+            [[self callbackPool] removeObjectForKey:key];
+            [[self playerPool] removeObjectForKey:key];
+            NSNotificationCenter *notificationCenter =
+                [NSNotificationCenter defaultCenter];
+            [notificationCenter removeObserver:self];
+        }
+    }
 }
 
-RCT_EXPORT_METHOD(setVolume:(nonnull NSNumber*)key withValue:(nonnull NSNumber*)value) {
-  AVAudioPlayer* player = [self playerForKey:key];
-  if (player) {
-    player.volume = [value floatValue];
-  }
+RCT_EXPORT_METHOD(setVolume
+                  : (nonnull NSNumber *)key withValue
+                  : (nonnull NSNumber *)value) {
+    AVAudioPlayer *player = [self playerForKey:key];
+    if (player) {
+        player.volume = [value floatValue];
+    }
 }
 
-RCT_EXPORT_METHOD(setPan:(nonnull NSNumber*)key withValue:(nonnull NSNumber*)value) {
-  AVAudioPlayer* player = [self playerForKey:key];
-  if (player) {
-    player.pan = [value floatValue];
-  }
+RCT_EXPORT_METHOD(getSystemVolume : (RCTResponseSenderBlock)callback) {
+    AVAudioSession *session = [AVAudioSession sharedInstance];
+    callback(@[ @(session.outputVolume) ]);
 }
 
-RCT_EXPORT_METHOD(setNumberOfLoops:(nonnull NSNumber*)key withValue:(nonnull NSNumber*)value) {
-  AVAudioPlayer* player = [self playerForKey:key];
-  if (player) {
-    player.numberOfLoops = [value intValue];
-  }
+RCT_EXPORT_METHOD(setPan
+                  : (nonnull NSNumber *)key withValue
+                  : (nonnull NSNumber *)value) {
+    AVAudioPlayer *player = [self playerForKey:key];
+    if (player) {
+        player.pan = [value floatValue];
+    }
 }
 
-RCT_EXPORT_METHOD(setSpeed:(nonnull NSNumber*)key withValue:(nonnull NSNumber*)value) {
-  AVAudioPlayer* player = [self playerForKey:key];
-  if (player) {
-    player.rate = [value floatValue];
-  }
+RCT_EXPORT_METHOD(setNumberOfLoops
+                  : (nonnull NSNumber *)key withValue
+                  : (nonnull NSNumber *)value) {
+    AVAudioPlayer *player = [self playerForKey:key];
+    if (player) {
+        player.numberOfLoops = [value intValue];
+    }
+}
+
+RCT_EXPORT_METHOD(setSpeed
+                  : (nonnull NSNumber *)key withValue
+                  : (nonnull NSNumber *)value) {
+    AVAudioPlayer *player = [self playerForKey:key];
+    if (player) {
+        player.rate = [value floatValue];
+    }
 }
 
 
@@ -295,21 +337,42 @@ RCT_EXPORT_METHOD(setCurrentTime:(nonnull NSNumber*)key withValue:(nonnull NSNum
   }
 }
 
-RCT_EXPORT_METHOD(getCurrentTime:(nonnull NSNumber*)key
-                  withCallback:(RCTResponseSenderBlock)callback) {
-  AVAudioPlayer* player = [self playerForKey:key];
-  if (player) {
-    callback(@[@(player.currentTime), @(player.isPlaying)]);
-  } else {
-    callback(@[@(-1), @(false)]);
-  }
+RCT_EXPORT_METHOD(getCurrentTime
+                  : (nonnull NSNumber *)key withCallback
+                  : (RCTResponseSenderBlock)callback) {
+    AVAudioPlayer *player = [self playerForKey:key];
+    if (player) {
+        callback([NSArray
+            arrayWithObjects:[NSNumber numberWithDouble:player.currentTime],
+                             [NSNumber numberWithBool:player.isPlaying], nil]);
+    } else {
+        callback([NSArray arrayWithObjects:[NSNumber numberWithInteger:-1],
+                                           [NSNumber numberWithBool:NO], nil]);
+    }
 }
 
-+ (BOOL)requiresMainQueueSetup
-{
+RCT_EXPORT_METHOD(setSpeakerPhone : (BOOL)on) {
+    AVAudioSession *session = [AVAudioSession sharedInstance];
+    if (on) {
+        [session overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker
+                                   error:nil];
+    } else {
+        [session overrideOutputAudioPort:AVAudioSessionPortOverrideNone
+                                   error:nil];
+    }
+    [session setActive:true error:nil];
+}
+
++ (BOOL)requiresMainQueueSetup {
     return YES;
 }
-- (void)setOnPlay:(BOOL)isPlaying forPlayerKey:(nonnull NSNumber*)playerKey {
-  [self sendEventWithName:@"onPlayChange" body:@{@"isPlaying": isPlaying ? @YES : @NO, @"playerKey": playerKey}];
+- (void)setOnPlay:(BOOL)isPlaying forPlayerKey:(nonnull NSNumber *)playerKey {
+    [self
+        sendEventWithName:@"onPlayChange"
+                     body:[NSDictionary
+                              dictionaryWithObjectsAndKeys:
+                                  [NSNumber
+                                      numberWithBool:isPlaying ? YES : NO],
+                                  @"isPlaying", playerKey, @"playerKey", nil]];
 }
 @end
